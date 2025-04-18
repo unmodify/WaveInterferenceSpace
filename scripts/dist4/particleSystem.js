@@ -20,7 +20,7 @@ export function setupParticleSystem(scene) {
     const geo = new THREE.CircleGeometry(radius, 16);
     const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = 2; // Render on top.
+    mesh.renderOrder = 2;
     particle.mesh = mesh;
     particleGroup.add(mesh);
     particles.push(particle);
@@ -33,7 +33,6 @@ export function setupParticleSystem(scene) {
       const fy = particleParams.forceEffect * grad.y;
       p.velocity.x += fx * delta;
       p.velocity.y += fy * delta;
-      // Simple friction
       p.velocity.x *= 0.98;
       p.velocity.y *= 0.98;
       p.position.x += p.velocity.x * delta;

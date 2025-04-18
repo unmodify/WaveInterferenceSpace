@@ -45,5 +45,5 @@ export function setupGuiSystem(points, material, updateUniforms, addPointCallbac
     }
   }
 
-  return { gui, addPointGUI, removePoint };
+  return { gui, addPointGUI, removePoint, pointFolders };
 }
