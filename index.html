@@ -1,14 +1,24 @@
-
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>My first three.js app</title>
-    <style>
-      body { margin: 0; }
-    </style>
-  </head>
-  <body>
-    <script type="module" src="/main.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Quick Dev</title>
+  <style>
+    body { 
+      margin: 0; /* Remove default margin to let the canvas fill the viewport */
+    }
+    #overlay {
+      position: absolute; /* Position it over the canvas */
+      top: 10px;         /* Distance from the top */
+      left: 10px;        /* Distance from the left */
+      z-index: 100;      /* Ensure it’s above the canvas */
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <select id="scriptSelector"></select>
+  </div>
+  <script type="module" src="/main.js"></script>
+</body>
 </html>
