@@ -10,17 +10,17 @@ import { createPoint } from "./dist4/utils.js";
 import { interpretCommand } from "./dist4/commandInterpreter.js";
 
 function main_dist4() {
-  // Renderer, scene, camera
+  // Renderer / Scene / Camera
   const renderer = setupRenderer();
   const { scene, camera } = setupSceneAndCamera();
 
-  // Shader
+  // Shader System
   const shader = setupShaderSystem(scene);
 
-  // Points
+  // Points Array
   const points = [
-    createPoint({ x: .3, y: .3, frequency: 10, amplitude: 1, phase: 0, phaseSpeed: 0 }),
-    createPoint({ x: .7, y: .7, frequency: 15, amplitude: 0.8, phase: 1, phaseSpeed: 0 })
+    createPoint({ x:0.3, y:0.3, frequency:10, amplitude:1, phase:0, phaseSpeed:0 }),
+    createPoint({ x:0.7, y:0.7, frequency:15, amplitude:0.8, phase:1, phaseSpeed:0 })
   ];
   function updateUniforms() {
     shader.material.uniforms.uPoints.value = getUniformPoints(points);
@@ -29,7 +29,7 @@ function main_dist4() {
   }
   updateUniforms();
 
-  // Circles overlay
+  // Circles Overlay
   const circlesGroup = new THREE.Group();
   scene.add(circlesGroup);
   let circlesVisible = true;
@@ -37,7 +37,7 @@ function main_dist4() {
     circlesGroup.clear();
     points.forEach(p => {
       const geom = new THREE.CircleGeometry(0.03, 32);
-      const mat  = new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false });
+      const mat  = new THREE.MeshBasicMaterial({ color:0x00ff00, depthTest:false });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(p.x*2-1, p.y*2-1, 0);
       mesh.renderOrder = 1;
@@ -45,75 +45,90 @@ function main_dist4() {
     });
   }
   updateCircles();
+
   function toggleCircles() {
     circlesVisible = !circlesVisible;
     circlesGroup.visible = circlesVisible;
   }
 
-  // GUI
+  // GUI System
   function addPointCallback(uv) {
-    const p = createPoint({ x: uv.x, y: uv.y, frequency: 10, amplitude: 1, phase: 0, phaseSpeed: 0 });
+    const p = createPoint({ x:uv.x, y:uv.y, frequency:10, amplitude:1, phase:0, phaseSpeed:0 });
     points.push(p);
-    updateUniforms(); updateCircles();
-    guiSystem.addPointGUI(p);
+    updateUniforms();
+    updateCircles();
     return p;
   }
   function removePointCallback(id) {
     if (points.length <= 1) { console.warn("Cannot remove last point."); return; }
     const idx = points.findIndex(p => p.id === id);
     if (idx >= 0) {
-      const [rem] = points.splice(idx, 1);
-      guiSystem.removePoint(rem.id);
-      updateUniforms(); updateCircles();
+      points.splice(idx,1);
+      updateUniforms();
+      updateCircles();
     }
   }
-  const guiSystem = setupGuiSystem(points, shader.material, updateUniforms, addPointCallback, removePointCallback);
-  points.forEach(p=>guiSystem.addPointGUI(p));
+  const { gui, addPointGUI, removePoint, syncPoints, pointFolders } =
+        setupGuiSystem(points, shader.material, updateUniforms, addPointCallback, removePointCallback);
+  points.forEach(p => addPointGUI(p));
 
-  // Particle system
-  const particleSystem = setupParticleSystem(scene);
-  const pf = guiSystem.gui.addFolder("Particles");
-  pf.add(particleSystem.particleParams, 'forceEffect', 0, 1).name("Force Effect");
-  pf.add(particleSystem.particleParams, 'info').name("Info").listen();
+  // Particle System
+  const ps = setupParticleSystem(scene);
+  const pf = gui.addFolder("Particles");
+  pf.add(ps.particleParams,'forceEffect',0,1).name("Force Effect");
+  pf.add(ps.particleParams,'info').name("Info").listen();
 
-  // Command UI + Help Button
-  const uiDiv = document.createElement('div');
-  Object.assign(uiDiv.style, {
-    position:'absolute', bottom:'10px', left:'10px', zIndex:100, fontFamily:'sans-serif'
+  // Command UI + Help
+  const ui = document.createElement('div');
+  Object.assign(ui.style, {
+    position:'absolute', bottom:'10px', left:'10px', zIndex:100, font:'12px sans-serif'
   });
-  uiDiv.innerHTML = `
-    <button id="helpBtn" style="font-size:16px;padding:4px;cursor:pointer;">?</button>
+  ui.innerHTML = `
+    <button id="helpBtn" style="font-size:16px;">?</button>
     <div id="helpBox" style="
       display:none;
-      max-width:300px;
-      background:rgba(0,0,0,0.7);
+      max-width:320px;
+      background:rgba(0,0,0,0.75);
       color:#fff;
-      padding:10px;
-      margin-top:5px;
-      border-radius:4px;
+      padding:12px;
+      margin-top:6px;
+      border-radius:6px;
       font-size:12px;
       line-height:1.4;
     ">
-      <strong>Interpreter Syntax</strong><br>
-      • <code>p.rem</code> – remove points<br>
-      • <code>p(1-3).xy(x,y)</code> – set x,y for points 1–3<br>
-      • <code>p(1,4).freq(v)</code>, <code>.ampl(v)</code>, <code>.phase(v)</code>, <code>.phaseSpeed(v)</code><br>
-      • <code>p.circle()</code> – arrange selected on circle<br>
-      • <code>p.grid()</code> – arrange on grid<br>
-      • <code>b.mode(add|subtract|...)</code> – blend mode<br>
-      • <code>part.force(v)</code>, <code>part.info(text)</code><br>
+      <strong>Point Indexing</strong><br>
+      • <code>p</code> – all points<br>
+      • <code>p(3)</code> – point 3 (creates up to 3 if needed)<br>
+      • <code>p(1,3)</code> – points 1 &amp; 3<br>
+      • <code>p(2-4)</code> – points 2,3,4<br>
+      • <code>p(1,3-5)</code> – points 1,3,4,5<br>
+      <br>
+      <strong>Point Actions</strong><br>
+      • <code>p.rem</code> – remove selected<br>
+      • <code>p.xy(x,y)</code> – set position<br>
+      • <code>p.freq(v)</code> – set frequency<br>
+      • <code>p.ampl(v)</code> – set amplitude<br>
+      • <code>p.phase(v)</code> – set phase<br>
+      • <code>p.phaseSpeed(v)</code> – set phase speed<br>
+      • <code>p.circle()</code> – arrange in circle<br>
+      • <code>p.grid()</code> – arrange in square grid<br>
+      <br>
+      <strong>Blend &amp; Particles</strong><br>
+      • <code>b.mode(add|subtract|…)</code><br>
+      • <code>part.force(v)</code> – particle force<br>
+      • <code>part.info(text)</code> – particle info text<br>
       <br>
       <strong>Mouse &amp; Keys</strong><br>
-      • Click empty space – add point<br>
-      • Click+drag point – move it<br>
-      • Space – remove point under cursor, or toggle circles<br>
-      • Z – spawn particle<br>
-      • Submit – run commands<br>
+      • Click empty – add point<br>
+      • Drag point – move point<br>
+      • <code>Space</code> – remove point under cursor (or toggle circles)<br>
+      • <code>Z</code> – spawn particle<br>
+      • <code>Submit</code> – run commands<br>
     </div>
     <textarea id="commandBox" rows="4" cols="40" placeholder="Enter commands…"></textarea><br>
-    <button id="submitCommand" style="margin-top:4px;">Submit Command</button>
+    <button id="submitCommand" style="margin-top:4px;">Submit</button>
   `;
-  document.body.appendChild(uiDiv);
+  document.body.appendChild(ui);
 
   const helpBtn = document.getElementById('helpBtn');
   const helpBox = document.getElementById('helpBox');
@@ -121,44 +136,40 @@ function main_dist4() {
     helpBox.style.display = helpBox.style.display === 'block' ? 'none' : 'block';
   });
 
-  const cmdBox = document.getElementById('commandBox');
-  document.getElementById('submitCommand').addEventListener('click', () => {
-    const txt = cmdBox.value.trim();
+  document.getElementById('submitCommand').onclick = () => {
+    const txt = document.getElementById('commandBox').value.trim();
     if (!txt) return;
     const context = {
       points,
       material: shader.material,
       blendModes: { add:0, subtract:1, multiply:2, normalize:3, min:4, max:5, average:6 },
-      particleParams: particleSystem.particleParams,
+      particleParams: ps.particleParams,
       removePoint: removePointCallback
     };
     interpretCommand(txt, context);
-    // sync GUI for new points
-    points.forEach(p => {
-      if (!guiSystem.pointFolders[p.id]) {
-        guiSystem.addPointGUI(p);
-      }
-    });
+    // Rebuild GUI folders to match data
+    syncPoints(points);
     updateUniforms();
     updateCircles();
-  });
+  };
 
-  // Event handlers
+  // Event Handlers
   setupEventHandlers(
     renderer, points, updateUniforms, updateCircles,
-    particleSystem.spawnParticle,
+    ps.spawnParticle,
     addPointCallback, removePointCallback,
-    toggleCircles
+    toggleCircles,
+    () => syncPoints(points)
   );
 
-  // Animation
+  // Animation Loop
   const clock = new THREE.Clock();
   (function animate() {
     requestAnimationFrame(animate);
     const dt = clock.getDelta();
     points.forEach(p => p.phase += p.phaseSpeed * dt);
     updateUniforms();
-    particleSystem.updateParticles(dt, points, getFieldGradient);
+    ps.updateParticles(dt, points, getFieldGradient);
     renderer.render(scene, camera);
   })();
 }

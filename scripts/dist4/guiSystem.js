@@ -21,6 +21,7 @@ export function setupGuiSystem(points, material, updateUniforms, addPointCallbac
   });
   gui.add(mainParams, 'addPoint').name('Add Point');
 
+  // Track only point‐related folders here:
   const pointFolders = {};
 
   function addPointGUI(point) {
@@ -38,12 +39,22 @@ export function setupGuiSystem(points, material, updateUniforms, addPointCallbac
     folder.open();
   }
 
-  function removePoint(pointId) {
-    if (pointFolders[pointId]) {
-      gui.removeFolder(pointFolders[pointId]);
-      delete pointFolders[pointId];
+  function removePoint(id) {
+    if (pointFolders[id]) {
+      gui.removeFolder(pointFolders[id]);
+      delete pointFolders[id];
     }
   }
 
-  return { gui, addPointGUI, removePoint, pointFolders };
+  function syncPoints(points) {
+    // remove all existing point folders
+    Object.keys(pointFolders).forEach(id => {
+      gui.removeFolder(pointFolders[id]);
+      delete pointFolders[id];
+    });
+    // re-create for each point in current array
+    points.forEach(p => addPointGUI(p));
+  }
+
+  return { gui, addPointGUI, removePoint, syncPoints, pointFolders };
 }
