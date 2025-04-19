@@ -33,7 +33,8 @@ export function setupShaderSystem(scene) {
       uPoints: { value: [] },
       uPhases: { value: [] },
       uPointCount: { value: 0 },
-      uBlendMode: { value: 0 }, // 0: add, 1: subtract, etc.
+      uBlendMode: { value: 0 },      // 0: add, 1: subtract, etc.
+      uMapMode: { value: 0 },       // 0: clip [-1..1], 1: remap to [0..1]
       uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
     },
     vertexShader: `
@@ -48,9 +49,10 @@ export function setupShaderSystem(scene) {
       uniform float uPhases[100];
       uniform int uPointCount;
       uniform int uBlendMode;
+      uniform int uMapMode;
       uniform vec2 uResolution;
       varying vec2 vUv;
-  
+
       void main() {
         float value = 0.0;
         float sum = 0.0;
@@ -58,7 +60,7 @@ export function setupShaderSystem(scene) {
         float minVal = 9999.0;
         float maxVal = -9999.0;
         float prod = 1.0;
-  
+
         for (int i = 0; i < uPointCount; i++) {
           vec2 center = uPoints[i].xy;
           float freq = uPoints[i].z;
@@ -67,7 +69,7 @@ export function setupShaderSystem(scene) {
           float dist = distance(vUv, center);
           float sinVal = amp * sin(dist * freq + phase);
           float circle = smoothstep(0.02, 0.015, dist);
-  
+
           if (uBlendMode == 0) {
             value += sinVal;
           } else if (uBlendMode == 1) {
@@ -83,10 +85,9 @@ export function setupShaderSystem(scene) {
           } else if (uBlendMode == 6) {
             sum += sinVal;
           }
-  
           value = mix(value, 1.0, circle);
         }
-  
+
         if (uBlendMode == 2) {
           value = prod;
         } else if (uBlendMode == 3 && count > 0.0) {
@@ -98,7 +99,12 @@ export function setupShaderSystem(scene) {
         } else if (uBlendMode == 6 && count > 0.0) {
           value = sum / count;
         }
-  
+
+        if (uMapMode == 1) {
+          // remap from [-1..1] to [0..1]
+          value = value * 0.5 + 0.5;
+        }
+
         gl_FragColor = vec4(vec3(value), 1.0);
       }
     `
