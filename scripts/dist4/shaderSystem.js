@@ -1,4 +1,4 @@
-// shaderSystem.js
+// dist4/shaderSystem.js
 import * as THREE from 'three';
 const UNIFORM_SIZE = 100;
 
@@ -30,12 +30,13 @@ export function getUniformPhases(points) {
 export function setupShaderSystem(scene) {
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      uPoints: { value: [] },
-      uPhases: { value: [] },
-      uPointCount: { value: 0 },
-      uBlendMode: { value: 0 },      // 0: add, 1: subtract, etc.
-      uMapMode: { value: 0 },       // 0: clip [-1..1], 1: remap to [0..1]
-      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+      uPoints:    { value: [] },
+      uPhases:    { value: [] },
+      uPointCount:{ value: 0 },
+      uBlendMode: { value: 0 },    // 0: add, 1: subtract, 2: multiply, 3: normalize, 4: min, 5: max, 6: average
+      uSumAmp:    { value: 1.0 },  // sum of all point amplitudes
+      uMapMode:   { value: 0 },    // 0: clip [-1..1], 1: remap to [0..1]
+      uResolution:{ value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
     },
     vertexShader: `
       varying vec2 vUv;
@@ -45,28 +46,29 @@ export function setupShaderSystem(scene) {
       }
     `,
     fragmentShader: `
-      uniform vec4 uPoints[100];
+      uniform vec4  uPoints[100];
       uniform float uPhases[100];
-      uniform int uPointCount;
-      uniform int uBlendMode;
-      uniform int uMapMode;
-      uniform vec2 uResolution;
-      varying vec2 vUv;
+      uniform int   uPointCount;
+      uniform int   uBlendMode;
+      uniform float uSumAmp;
+      uniform int   uMapMode;
+      uniform vec2  uResolution;
+      varying vec2  vUv;
 
       void main() {
-        float value = 0.0;
-        float sum = 0.0;
-        float count = float(uPointCount);
+        float value  = 0.0;
+        float sum    = 0.0;
+        float count  = float(uPointCount);
         float minVal = 9999.0;
         float maxVal = -9999.0;
-        float prod = 1.0;
+        float prod   = 1.0;
 
         for (int i = 0; i < uPointCount; i++) {
-          vec2 center = uPoints[i].xy;
-          float freq = uPoints[i].z;
-          float amp = uPoints[i].w;
-          float phase = uPhases[i];
-          float dist = distance(vUv, center);
+          vec2  center = uPoints[i].xy;
+          float freq   = uPoints[i].z;
+          float amp    = uPoints[i].w;
+          float phase  = uPhases[i];
+          float dist   = distance(vUv, center);
           float sinVal = amp * sin(dist * freq + phase);
           float circle = smoothstep(0.02, 0.015, dist);
 
@@ -85,9 +87,12 @@ export function setupShaderSystem(scene) {
           } else if (uBlendMode == 6) {
             sum += sinVal;
           }
+
+          // overlay circle highlight
           value = mix(value, 1.0, circle);
         }
 
+        // finalize based on blend mode
         if (uBlendMode == 2) {
           value = prod;
         } else if (uBlendMode == 3 && count > 0.0) {
@@ -100,8 +105,16 @@ export function setupShaderSystem(scene) {
           value = sum / count;
         }
 
+        // normalize add/subtract and average to [-1..1]
+        if (uBlendMode == 0 || uBlendMode == 1) {
+          if (uSumAmp > 0.0) value = value / uSumAmp;
+        } else if (uBlendMode == 6 && count > 0.0) {
+          float meanAmp = uSumAmp / count;
+          if (meanAmp > 0.0) value = value / meanAmp;
+        }
+
+        // optional remap to [0..1]
         if (uMapMode == 1) {
-          // remap from [-1..1] to [0..1]
           value = value * 0.5 + 0.5;
         }
 
@@ -109,8 +122,10 @@ export function setupShaderSystem(scene) {
       }
     `
   });
+
   const geometry = new THREE.PlaneGeometry(2, 2);
-  const plane = new THREE.Mesh(geometry, material);
+  const plane    = new THREE.Mesh(geometry, material);
   scene.add(plane);
+
   return { material };
 }

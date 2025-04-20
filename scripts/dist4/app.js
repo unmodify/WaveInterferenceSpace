@@ -1,5 +1,5 @@
 // app.js
-import initApp from './dist4/appCore.js';
+import initApp from './appCore.js';
 
 // Bootstrap the application
 const app = initApp();

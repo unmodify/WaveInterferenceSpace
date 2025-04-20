@@ -1,6 +1,6 @@
-// eventHandlers.js
+// dist4/eventHandlers.js
 export function setupEventHandlers(
-  renderer,
+  canvas,                // The renderer’s DOM element
   points,
   updateUniforms,
   updateCircles,
@@ -8,7 +8,7 @@ export function setupEventHandlers(
   addPointCallback,
   removePointCallback,
   toggleCirclesCallback,
-  syncGui                  // callback to sync GUI
+  syncGui
 ) {
   let selectedPointId = null;
   let isDragging = false;
@@ -17,26 +17,27 @@ export function setupEventHandlers(
   function getPointAtUV(uv) {
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
-      const dist = Math.hypot(p.x - uv.x, p.y - uv.y);
-      if (dist < 0.05) return { point: p, id: p.id };
+      if (Math.hypot(p.x - uv.x, p.y - uv.y) < 0.05) {
+        return { point: p, id: p.id };
+      }
     }
     return null;
   }
 
   function updateLatestUV(e) {
-    const rect = renderer.domElement.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = 1 - (e.clientY - rect.top) / rect.height;
-    latestUV = { x, y };
+    const rect = canvas.getBoundingClientRect();
+    latestUV = {
+      x: (e.clientX - rect.left) / rect.width,
+      y: 1 - (e.clientY - rect.top) / rect.height
+    };
   }
 
-  // Always track pointer moves over the whole document
-  document.addEventListener('pointermove', e => {
-    updateLatestUV(e);
-  });
+  // Keep UV updated on pointermove and mousemove
+  document.addEventListener('pointermove', updateLatestUV);
+  canvas.addEventListener('mousemove', updateLatestUV);
 
-  // Pointer down: select or add
-  renderer.domElement.addEventListener('pointerdown', e => {
+  // Pointer down: start drag if over a point, else add a new point
+  canvas.addEventListener('pointerdown', e => {
     updateLatestUV(e);
     const hit = getPointAtUV(latestUV);
     if (hit) {
@@ -45,14 +46,12 @@ export function setupEventHandlers(
     } else {
       addPointCallback(latestUV);
       syncGui(points);
-      selectedPointId = null;
-      isDragging = false;
     }
   });
 
-  // Pointer move: if dragging, move point
-  renderer.domElement.addEventListener('pointermove', e => {
-    if (!isDragging) return;
+  // Pointer move: if dragging, move the selected point
+  canvas.addEventListener('pointermove', e => {
+    if (!isDragging || selectedPointId === null) return;
     updateLatestUV(e);
     const idx = points.findIndex(p => p.id === selectedPointId);
     if (idx !== -1) {
@@ -64,15 +63,13 @@ export function setupEventHandlers(
     }
   });
 
-  // Pointer up: stop drag
-  renderer.domElement.addEventListener('pointerup', () => {
-    if (isDragging) {
-      isDragging = false;
-      selectedPointId = null;
-    }
+  // Pointer up: end drag
+  canvas.addEventListener('pointerup', () => {
+    isDragging = false;
+    selectedPointId = null;
   });
 
-  // Key handling
+  // Keyboard: Space removes point under cursor or toggles circles; Z spawns particle
   document.addEventListener('keydown', e => {
     if (e.code === 'Space') {
       e.preventDefault();
